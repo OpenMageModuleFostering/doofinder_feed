@@ -1,0 +1,16 @@
+{
+    "name": "OpenMageModuleFostering/Doofinder_Feed",
+    "type": "magento-module",
+    "license": "Open-Software-License-(OSL-3.0)",
+    "homepage": "",
+    "description": "This plugin allows you to integrate Doofinder in your store with almost no effort.",
+    "authors": [
+    {
+        "name": "Carlos Escribano Rey",
+        "email": "carlos@doofinder.com"
+    }
+],
+    "suggest": {
+        "magento-hackathon/magento-composer-installer": "*"
+    }
+}
