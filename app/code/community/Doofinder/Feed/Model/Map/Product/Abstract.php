@@ -6,13 +6,13 @@
 /**
  * @category   Models
  * @package    Doofinder_Feed
- * @version    1.8.1
+ * @version    1.8.10
  */
 
 /**
  * Abstract Product Map Model for Doofinder Feed
  *
- * @version    1.8.1
+ * @version    1.8.10
  * @package    Doofinder_Feed
  */
 class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
@@ -21,9 +21,24 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
     protected $skip = false;
     protected $_attributeSetModel;
 
+    /**
+     * @var Doofinder_Feed_Helper_Log
+     */
+    protected $_log;
+
+    /**
+     * Initialize log
+     */
+    public function _construct()
+    {
+        parent::_construct();
+        $this->_log = Mage::helper('doofinder_feed/log');
+    }
 
     public function initialize()
     {
+        $this->_log->_debugEnabled && $this->_log->debug(sprintf('Initializing %s for product %d', get_called_class(), $this->getProduct()->getId()));
+
         $currency_code = Mage::app()
             ->getStore($this->getData('store_code'))
             ->getCurrentCurrencyCode();
@@ -47,9 +62,13 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
     public function map()
     {
+        $this->_log->_debugEnabled && $this->_log->debug(sprintf('Mapping product %d', $this->getProduct()->getId()));
+
         $this->_beforeMap();
         $rows = $this->_map();
         $this->_afterMap($rows);
+
+        $this->_log->_debugEnabled && $this->_log->debug(sprintf('Map for product %d: %s', $this->getProduct()->getId(), json_encode($rows)));
 
         return $rows;
     }
@@ -213,83 +232,57 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $this->mapDirectiveImageLink($args, 'small_image');
     }
 
-    public function collectProductPrices()
+    /**
+     * Get product price
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @param string $field
+     * @return string|null
+     */
+    protected function getProductPrice($field)
     {
-        if ( ! $this->getData('collected_product_prices') )
-        {
-            $dataHelper = Mage::helper('doofinder_feed');
-            $taxHelper = Mage::helper('tax');
-
-            $datum = $dataHelper->collectProductPrices(
-                $this->getProduct(),
-                $this->getGenerator()->getStore(),
-                true,
-                $this->getGenerator()->getData('minimal_price'),
-                $this->getGenerator()->getData('grouped')
-            );
-
-            $priceDisplayType = $taxHelper->getPriceDisplayType($this->getGenerator()->getStore());
-
-            if ( $priceDisplayType == Mage_Tax_Model_Config::DISPLAY_TYPE_INCLUDING_TAX
-                 || $priceDisplayType == Mage_Tax_Model_Config::DISPLAY_TYPE_BOTH )
-            {
-                $priceKey = 'including_tax';
-            }
-            else
-            {
-                $priceKey = 'excluding_tax';
-            }
-
-            $priceType = isset($datum['price_type']) ? $datum['price_type'] : false;
-
-            $prices = array(
-                'price_type' => $priceType,
-            );
-
-            foreach ( $datum as $priceType => $data ) {
-                if ( !is_array($data) ) continue;
-
-                foreach ( $data as $key => $price ) {
-                    if ( $key == $priceKey ) {
-                        $prices[$priceType] = $data[$key];
-                    }
-                }
-            }
-
-            $this->setData('collected_product_prices', $prices);
+        if (!Mage::getStoreConfig('doofinder_cron/feed_settings/display_price', $this->getStoreCode())) {
+            return null;
         }
 
-        return $this->getData('collected_product_prices');
+        $tax = null;
+        if (Mage::helper('tax')->needPriceConversion($this->getStoreCode())) {
+            switch (Mage::getStoreConfig('doofinder_cron/feed_settings/price_tax_mode', $this->getStoreCode())) {
+                case Doofinder_Feed_Model_System_Config_Source_Feed_Pricetaxmode::MODE_WITH_TAX:
+                    $tax = true;
+                    break;
+
+                case Doofinder_Feed_Model_System_Config_Source_Feed_Pricetaxmode::MODE_WITHOUT_TAX:
+                    $tax = false;
+                    break;
+            }
+        }
+
+        $price = Mage::helper('doofinder_feed')->getProductPrice($this->getProduct(), $field, $tax);
+
+        if ($price === null) {
+            return $price;
+        }
+
+        $store = Mage::app()->getStore($this->getStoreCode());
+
+        // Return price converted to store currency
+        return Mage::helper('core')->currencyByStore($price, $store, false, false);
+    }
+
+    protected function mapFieldPrice()
+    {
+        return $this->mapDirectivePrice();
     }
 
     protected function mapDirectivePrice()
     {
-        $prices = $this->collectProductPrices();
-
-        if ( ! array_key_exists('price', $prices) )
-            return null;
-
-        $fieldData = $this->cleanField($prices['price']);
-
-        if ( $fieldData < 0 )
-            $this->skip = true;
-
-        return $fieldData;
+        return $this->getProductPrice('price');
     }
 
     protected function mapDirectiveSalePrice()
     {
-        $prices = $this->collectProductPrices();
-
-        if ( ! array_key_exists('sale_price', $prices) )
-            return null;
-
-        $fieldData = $this->cleanField($prices['sale_price']);
-
-        if ( $fieldData <= 0 )
-            return null;
-
-        return $fieldData;
+        return $this->getProductPrice('sale_price');
     }
 
     protected function mapDirectiveCurrency()
@@ -465,63 +458,6 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
         return $assocIds;
     }
-
-    public function getPrice()
-    {
-        return $this->getProduct()->getPrice();
-    }
-
-    public function calcMinimalPrice($product)
-    {
-        return $product->getMinimalPrice();
-    }
-
-    public function getSpecialPrice()
-    {
-        return $this->getProduct()->getSpecialPrice();
-    }
-
-    public function hasSpecialPrice()
-    {
-        $has = false;
-        $product = $this->getProduct();
-
-        if ($this->getSpecialPrice() <= 0)
-            return $has;
-        if (is_empty_date($product->getSpecialFromDate()))
-            return $has;
-
-        $cDate = Mage::app()->getLocale()->date(null, null, Mage::app()->getLocale()->getDefaultLocale());
-        $timezone = Mage::app()->getStore($this->getStoreId())->getConfig(Mage_Core_Model_Locale::XML_PATH_DEFAULT_TIMEZONE);
-
-        $fromDate = new Zend_Date(null, null, Mage::app()->getLocale()->getDefaultLocale());
-        if ($timezone) $fromDate->setTimezone($timezone);
-        $fromDate->setDate(substr($product->getSpecialFromDate(), 0, 10), 'yyyy-MM-dd');
-        $fromDate->setTime(substr($product->getSpecialFromDate(), 11, 8), 'HH:mm:ss');
-
-        $toDate = new Zend_Date(null, null, Mage::app()->getLocale()->getDefaultLocale());
-        if (!is_empty_date($product->getSpecialToDate())) {
-            if ($timezone) $toDate->setTimezone($timezone);
-            $toDate->setDate(substr($product->getSpecialToDate(), 0, 10), 'yyyy-MM-dd');
-            $toDate->setTime('23:59:59', 'HH:mm:ss');
-        } else {
-            if ($timezone) $toDate->setTimezone($timezone);
-            $toDate->setDate($cDate->toString('yyyy-MM-dd'), 'yyyy-MM-dd');
-            $toDate->setTime('23:59:59', 'HH:mm:ss');
-            $toDate->add(7, Zend_Date::DAY);
-        }
-
-        if (($fromDate->compare($cDate) == -1
-                || $fromDate->compare($cDate) == 0)
-            && ($toDate->compare($cDate) == 1
-                || $toDate->compare($cDate) == 0))
-        {
-            $has = true;
-        }
-
-        return $has;
-    }
-
 
     //
     // protected::Tools
