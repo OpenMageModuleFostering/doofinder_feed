@@ -3,7 +3,7 @@
 
     <modules>
         <Doofinder_Feed>
-            <version>1.7.1</version>
+            <version>1.7.2</version>
         </Doofinder_Feed>
     </modules>
     <global>
@@ -78,14 +78,6 @@
                     </doofinder_feed>
                 </observers>
             </catalog_product_save_after>
-            <resource_get_tablename>
-                <observers>
-                    <doofinder_feed>
-                        <class>doofinder_feed/observers_autoloader</class>
-                        <method>addAutoloader</method>
-                    </doofinder_feed>
-                </observers>
-            </resource_get_tablename>
         </events>
     </global>
 
