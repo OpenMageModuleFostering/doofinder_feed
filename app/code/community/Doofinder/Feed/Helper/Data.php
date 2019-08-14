@@ -6,13 +6,13 @@
 /**
  * @category   Helpers
  * @package    Doofinder_Feed
- * @version    1.8.6
+ * @version    1.8.7
  */
 
 /**
  * Data helper for Doofinder Feed
  *
- * @version    1.8.6
+ * @version    1.8.7
  * @package    Doofinder_Feed
  */
 class Doofinder_Feed_Helper_Data extends Mage_Core_Helper_Abstract
@@ -56,7 +56,7 @@ class Doofinder_Feed_Helper_Data extends Mage_Core_Helper_Abstract
      * @param boolean|null $tax = null
      * @return float
      */
-    public function getProductPrice(Magento_Catalog_Model_Product $product, $attribute = 'price', $tax = null)
+    public function getProductPrice(Mage_Catalog_Model_Product $product, $attribute = 'price', $tax = null)
     {
         $taxHelper = Mage::helper('tax');
 
