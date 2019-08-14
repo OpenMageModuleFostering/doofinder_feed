@@ -85,9 +85,6 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
             // Compare results count and checksum
             if (min($helper->getResultsCount(), $maxResults) == $this->getStoredResultsCount($query->getId()) &&
                 $this->calculateChecksum($results) == $this->calculateChecksum($storedResults)) {
-                
-                // Set search results
-                $this->setResults($storedResults);
                 return $this;
             }
 
@@ -106,17 +103,6 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
             if (!empty($results)) {
                 $data = array();
                 $relevance = count($results);
-
-                // Filter out ids to only those that exists in db
-                $productCollection = Mage::getModel('catalog/product')->getCollection()
-                    ->addAttributeToSelect('entity_id')
-                    ->addAttributeToFilter('entity_id', array('in' => $results))
-                    ->load();
-                foreach ($productCollection as $product) {
-                    $productIds[] = $product->getId();
-                }
-                $results = array_intersect($results, $productIds);
-
                 foreach($results as $product_id) {
                     $data[] = array(
                         'query_id'   => $query->getId(),
@@ -126,9 +112,6 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
                 }
 
                 $adapter->insertOnDuplicate($this->getTable('catalogsearch/result'), $data);
-
-                // Set search results
-                $this->setResults($results);
             }
 
             $query->setIsProcessed(1);
@@ -139,24 +122,6 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
         }
 
         return $this;
-    }
-
-    /**
-     * Set search results
-     *
-     * @param array[int] $results
-     * @notice Required for Magento 1.9.3.0+
-     */
-    protected function setResults(array $results)
-    {
-        $data = array();
-        $relevance = count($results);
-        
-        foreach ($results as $productId) {
-                $data[$productId] = $relevance--;
-        }
-
-        $this->_foundData = $data;
     }
 
     /**
