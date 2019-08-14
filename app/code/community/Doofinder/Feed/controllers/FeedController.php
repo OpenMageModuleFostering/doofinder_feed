@@ -6,13 +6,13 @@
 /**
  * @category   controllers
  * @package    Doofinder_Feed
- * @version    1.8.17
+ * @version    1.8.2
  */
 
 /**
  * Feed controller for Doofinder Feed
  *
- * @version    1.8.17
+ * @version    1.8.2
  * @package    Doofinder_Feed
  */
 class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
@@ -80,9 +80,7 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
 
         if ($offset > 0) {
             $collection = $generator->getProductCollection();
-            // @codingStandardsIgnoreStart
             $collection->getSelect()->limit(1, $offset);
-            // @codingStandardsIgnoreEnd
 
             $item = $collection->fetchItem();
 
@@ -117,23 +115,28 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
         $filesUrl = Mage::getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA).'doofinder'.DS;
         $filesPath = Mage::getBaseDir('media').DS.'doofinder'.DS;
 
-        foreach ($storeCodes as $code) {
+        foreach ($storeCodes as $code)
+        {
             $settings = $helper->getStoreConfig($code, false);
 
-            if ($settings['enabled']) {
+            if ($settings['enabled'])
+            {
                 $filepath = $filesPath.$settings['xmlName'];
+                $fileurl = $filesUrl.$settings['xmlName'];
                 $feedUrl = $filesUrl.$settings['xmlName'];
                 $feedExists = (bool) $this->_feedExists($filepath);
-            } else {
+            }
+            else
+            {
                 $feedUrl = Mage::getUrl('doofinder/feed', array('_store' => $code));
                 $feedExists = true;
             }
 
             $oStore = Mage::app()->getStore($code);
-            $locale = Mage::getStoreConfig('general/locale/code', $oStore->getId());
+            $L = Mage::getStoreConfig('general/locale/code', $oStore->getId());
             $password = Mage::getStoreConfig('doofinder_cron/feed_settings/password', $code);
             $storesConfiguration[$code] = array(
-                'language' => strtoupper(substr($locale, 0, 2)),
+                'language' => strtoupper(substr($L, 0, 2)),
                 'currency' => $oStore->getCurrentCurrencyCode(),
                 'feed' =>  $feedUrl,
                 'feed_exists' => $feedExists,
@@ -165,17 +168,19 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
      * @param string $filepath
      * @return bool
      */
-    protected function _feedExists($filepath = null)
-    {
-        return Mage::helper('doofinder_feed')->fileExists($filepath);
+    protected function _feedExists($filepath = null) {
+        if (file_exists($filepath)) {
+            return true;
+        }
+        return false;
     }
 
-    protected function _dumpMessage($level, $message, $extra = array())
+    protected function _dumpMessage($s_level, $s_message, $a_extra=array())
     {
-        $error = array('status' => $level, 'message' => $message);
+        $error = array('status' => $s_level, 'message' => $s_message);
 
-        if (is_array($extra) && !empty($extra))
-            $error = array_merge($error, $extra);
+        if (is_array($a_extra) && count($a_extra))
+            $error = array_merge($error, $a_extra);
 
         $this->_setJSONHeaders();
 
@@ -197,10 +202,10 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
     {
         $storeCode = $this->getRequest()->getParam('language');
 
-        if ($storeCode === null)
+        if (is_null($storeCode))
             $storeCode = $this->getRequest()->getParam('store'); // Backwards...
 
-        if ($storeCode === null)
+        if (is_null($storeCode))
             $storeCode = Mage::app()->getStore()->getCode();
 
         try
@@ -209,11 +214,8 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
         }
         catch(Mage_Core_Model_Store_Exception $e)
         {
-            $this->_dumpMessage(
-                'error',
-                'Invalid <language> parameter.',
-                array('code' => 'INVALID_OPTIONS')
-            );
+            $this->_dumpMessage('error', 'Invalid <language> parameter.',
+                                array('code' => 'INVALID_OPTIONS'));
         }
     }
 
@@ -221,16 +223,16 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
     {
         $value = strtolower($this->getRequest()->getParam($param));
 
-        if (is_numeric($value))
+        if ( is_numeric($value) )
             return ((int)($value *= 1) > 0);
 
-        $true = array('true', 'on', 'yes');
-        $false  = array('false', 'off', 'no');
+        $yes = array('true', 'on', 'yes');
+        $no  = array('false', 'off', 'no');
 
-        if (in_array($value, $true))
+        if ( in_array($value, $yes) )
             return true;
 
-        if (in_array($value, $false))
+        if ( in_array($value, $no) )
             return false;
 
         return $defaultValue;
@@ -239,7 +241,7 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
     protected function _getInteger($param, $defaultValue)
     {
         $value = $this->getRequest()->getParam($param);
-        if (is_numeric($value))
+        if ( is_numeric($value) )
             return (int)($value *= 1);
         return $defaultValue;
     }
@@ -249,8 +251,81 @@ class Doofinder_Feed_FeedController extends Mage_Core_Controller_Front_Action
      * @param string $dir
      * @return bool
      */
-    protected function _createDirectory($dir = null)
-    {
-        return Mage::helper('doofinder_feed')->mkdir($dir);
+    protected function _createDirectory($dir = null) {
+        if (!$dir) return false;
+
+        if(!mkdir($dir, 0777, true)) {
+           Mage::throwException('Could not create directory: '.$dir);
+        }
+
+        return true;
     }
+
+    /*
+        TEST TOOLS
+    */
+
+    // public function testsAction()
+    // {
+    //     if ( !in_array(Mage::helper('core/http')->getRemoteAddr(), array('127.0.0.1', '::1')) )
+    //     {
+    //         $this->norouteAction();
+    //         return false;
+    //     }
+
+    //     $oStore           = Mage::app()->getStore($this->_getStoreCode());
+    //     $bGrouped         = $this->_getBoolean('grouped', true);
+    //     $bMinimalPrice    = $this->_getBoolean('minimal_price', false);
+    //     $bCurrencyConvert = $this->_getBoolean('convert_currency', true);
+    //     $iCustomerGroupId = $this->_getInteger('customer_group', 0);
+
+    //     $ids = array(
+    //         'simple' => array(166, 27),
+    //         'grouped' => 54,
+    //         'configurable' => 83,
+    //         'virtual' => 142,
+    //         'bundle' => 158,
+    //         'downloadable' => 167
+    //     );
+
+    //     $data = array(
+    //         'store' => array(
+    //             'store_id' => $oStore->getStoreId(),
+    //             'website_id' => $oStore->getWebsiteId(),
+    //             'base_currency' => $oStore->getBaseCurrencyCode(),
+    //             'current_currency' => $oStore->getCurrentCurrencyCode(),
+    //             'default_currency' => $oStore->getDefaultCurrencyCode(),
+    //         ),
+    //         'products' => array(),
+    //     );
+
+    //     $rule = Mage::getModel('catalogrule/rule');
+    //     $dataHelper = Mage::helper('doofinder_feed');
+
+    //     foreach ($ids as $product_type => $ids)
+    //     {
+    //         foreach ((array) $ids as $id)
+    //         {
+    //             $product = Mage::getModel('catalog/product')
+    //                 ->setStoreId($oStore->getStoreId())
+    //                 ->setCustomerGroupId($iCustomerGroupId)
+    //                 ->load($id);
+
+    //             $data['products'][$id] = array(
+    //                 'product_type' => $product_type,
+    //                 'name' => $product->getName(),
+    //             );
+
+    //             $data['products'][$id] = array_merge(
+    //                 $data['products'][$id],
+    //                 $dataHelper->collectProductPrices($product, $oStore, $bCurrencyConvert, $bMinimalPrice, $bGrouped)
+    //             );
+    //         }
+    //     }
+
+    //     $this->_setJSONHeaders();
+
+    //     $response = Mage::helper('core')->jsonEncode($data);
+    //     $this->getResponse()->setBody($response);
+    // }
 }

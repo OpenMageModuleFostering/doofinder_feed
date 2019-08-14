@@ -6,7 +6,7 @@
 /**
  * @category   Models
  * @package    Doofinder_Feed
- * @version    1.8.17
+ * @version    1.8.2
  */
 
 class Doofinder_Feed_Model_Observers_Logs
@@ -17,13 +17,10 @@ class Doofinder_Feed_Model_Observers_Logs
     /**
      * Clear logs that are beyond the limit
      *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @param Varien_Event_Observer $observer
      */
-    // @codingStandardsIgnoreStart
     public function clearLogs($observer)
     {
-    // @codingStandardsIgnoreEnd
         $collection = Mage::getModel('doofinder_feed/log')->getCollection();
 
         $size = $collection->getSize();
@@ -33,15 +30,12 @@ class Doofinder_Feed_Model_Observers_Logs
 
             $offset = max(static::MAX_SIZE, $size - static::BATCH_LIMIT);
 
-            // @codingStandardsIgnoreStart
-            $collection->getSelect()->limit(static::BATCH_LIMIT, $offset);
-            // @codingStandardsIgnoreEnd
+            $collection->getSelect()
+                ->limit(static::BATCH_LIMIT, $offset);
 
             $ids = array();
             foreach ($collection->getItems() as $item) {
-                // @codingStandardsIgnoreStart
                 $item->delete();
-                // @codingStandardsIgnoreEnd
                 $ids[] = $item->id;
             }
 

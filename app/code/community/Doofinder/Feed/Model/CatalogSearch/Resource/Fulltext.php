@@ -5,20 +5,18 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
     /**
      * Get stored results select
      *
-     * @param int $queryId
+     * @param int $query_id
      * @param int $attr
      * @return Varien_Db_Select
      */
-    protected function _getStoredResultsSelect($queryId, $attr = 'product_id')
+    protected function getStoredResultsSelect($query_id, $attr = 'product_id')
     {
         $adapter = $this->_getReadAdapter();
 
-        // @codingStandardsIgnoreStart
         $select = $adapter->select()
             ->from($this->getTable('catalogsearch/result'), $attr)
-            ->where('query_id = ?', $queryId)
+            ->where('query_id = ?', $query_id)
             ->order('relevance desc');
-        // @codingStandardsIgnoreEnd
 
         return $select;
     }
@@ -26,25 +24,18 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
     /**
      * Get stored results in CatalogSearch cache
      *
-     * @param int $queryId
-     * @param int $limit = null
+     * @param int $query_id
+     * @param int $limit
      * @return array
      */
-    protected function _getStoredResults($queryId, $limit = null)
+    protected function getStoredResults($query_id, $limit)
     {
         $adapter = $this->_getReadAdapter();
-        $select = $this->_getStoredResultsSelect($queryId);
-
-        if ($limit) {
-            // @codingStandardsIgnoreStart
-            $select->limit($limit);
-            // @codingStandardsIgnoreEnd
-        }
+        $select = $this->getStoredResultsSelect($query_id);
+        $select->limit($limit);
 
         $results = array();
-        // @codingStandardsIgnoreStart
         foreach ($adapter->fetchAll($select) as $result) {
-        // @codingStandardsIgnoreEnd
             $results[] = $result['product_id'];
         }
 
@@ -54,13 +45,13 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
     /**
      * Get number of stored results in CatalogSearch cache
      *
-     * @param int $queryId
+     * @param int $query_id
      * @return array
      */
-    protected function _getStoredResultsCount($queryId)
+    protected function getStoredResultsCount($query_id)
     {
         $adapter = $this->_getReadAdapter();
-        $select = $this->_getStoredResultsSelect($queryId, 'COUNT(*)');
+        $select = $this->getStoredResultsSelect($query_id, 'COUNT(*)');
 
         return (int) $adapter->fetchOne($select);
     }
@@ -76,7 +67,7 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
      */
     public function prepareResult($object, $queryText, $query)
     {
-        if (!Mage::getStoreConfigFlag('doofinder_search/internal_settings/enable', Mage::app()->getStore())) {
+        if(!Mage::getStoreConfigFlag('doofinder_search/internal_settings/enable', Mage::app()->getStore())) {
             return parent::prepareResult($object, $queryText, $query);
         }
 
@@ -88,31 +79,27 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
         $adapter = $this->_getWriteAdapter();
 
         if ($query->getIsProcessed()) {
-            $storedResults = $this->_getStoredResults($query->getId(), count($results));
-            $maxResults = Mage::getStoreConfig(
-                'doofinder_search/internal_settings/total_limit',
-                Mage::app()->getStore()
-            );
+            $storedResults = $this->getStoredResults($query->getId(), count($results));
+            $maxResults = Mage::getStoreConfig('doofinder_search/internal_settings/total_limit', Mage::app()->getStore());
 
             // Compare results count and checksum
-            if (min($helper->getResultsCount(), $maxResults) == $this->_getStoredResultsCount($query->getId())
-                && $this->calculateChecksum($results) == $this->calculateChecksum($storedResults)
-            ) {
+            if (min($helper->getResultsCount(), $maxResults) == $this->getStoredResultsCount($query->getId()) &&
+                $this->calculateChecksum($results) == $this->calculateChecksum($storedResults)) {
+                
                 // Set search results
-                $this->setResults($this->_getStoredResults($query->getId()));
+                $this->setResults($storedResults);
                 return $this;
             }
 
             // Delete results
-            // @codingStandardsIgnoreStart
             $select = $adapter->select()
                 ->from($this->getTable('catalogsearch/result'), 'product_id')
                 ->where('query_id = ?', $query->getId());
             $adapter->query($adapter->deleteFromSelect($select, $this->getTable('catalogsearch/result')));
-            // @codingStandardsIgnoreEnd
         }
 
         try {
+
             // Fetch all results
             $results = $helper->getAllResults();
 
@@ -128,13 +115,12 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
                 foreach ($productCollection as $product) {
                     $productIds[] = $product->getId();
                 }
-
                 $results = array_intersect($results, $productIds);
 
-                foreach ($results as $productId) {
+                foreach($results as $product_id) {
                     $data[] = array(
                         'query_id'   => $query->getId(),
-                        'product_id' => $productId,
+                        'product_id' => $product_id,
                         'relevance'  => $relevance--,
                     );
                 }
@@ -146,6 +132,7 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
             }
 
             $query->setIsProcessed(1);
+
         } catch (Exception $e) {
             Mage::logException($e);
             return parent::prepareResult($object, $queryText, $query);
@@ -164,7 +151,7 @@ class Doofinder_Feed_Model_CatalogSearch_Resource_Fulltext extends Mage_CatalogS
     {
         $data = array();
         $relevance = count($results);
-
+        
         foreach ($results as $productId) {
                 $data[$productId] = $relevance--;
         }

@@ -6,13 +6,13 @@
 /**
  * @category   Models
  * @package    Doofinder_Feed
- * @version    1.8.17
+ * @version    1.8.2
  */
 
 /**
  * Associated Product Map Model for Doofinder Feed
  *
- * @version    1.8.17
+ * @version    1.8.2
  * @package    Doofinder_Feed
  */
 class Doofinder_Feed_Model_Map_Product_Associated
@@ -42,9 +42,12 @@ class Doofinder_Feed_Model_Map_Product_Associated
     {
         $product = $this->getProduct();
 
-        if ($product->isVisibleInSiteVisibility()) {
+        if ($product->isVisibleInSiteVisibility())
+        {
             $value = $this->getCellValue(array('map' => $params['map']));
-        } else {
+        }
+        else
+        {
             $value = $this->getParentMap()->mapField('link');
 
             if ($this->getConfigVar('associated_products_link_add_unique', 'columns'))
@@ -62,10 +65,12 @@ class Doofinder_Feed_Model_Map_Product_Associated
     {
         $params = array();
 
-        foreach ($codes as $attrCode) {
+        foreach ($codes as $attrCode)
+        {
             $data = $product->getData($attrCode);
 
-            if (empty($data)) {
+            if (empty($data))
+            {
                 $this->skip = true;
                 return $value;
             }
@@ -74,9 +79,12 @@ class Doofinder_Feed_Model_Map_Product_Associated
         }
 
         $uri = Zend_Uri::factory($value);
+        $scheme = $uri->getScheme();
         $query = $uri->getQueryAsArray();
+        $port = $uri->getPort();
 
-        if ($uri->valid()) {
+        if ($uri->valid())
+        {
             $params = array_merge($query, $params);
             $uri->setQuery($params);
 
@@ -99,17 +107,18 @@ class Doofinder_Feed_Model_Map_Product_Associated
         return $value;
     }
 
-    public function mapDirectiveAvailability($params = array())
+    public function mapFieldAvailability($params = array())
     {
         $args = array('map' => $params['map']);
-        $value = $this->getParentMap()->mapDirectiveAvailability($args);
-
+        $value = "";
+        $value = $this->getParentMap()->mapField('availability');
         // gets out of stock if parent is out of stock
-        if ($this->getConfig()->getOutOfStockStatus() == $value) {
+        if (strcasecmp($this->getConfig()->getOutOfStockStatus(), $value) == 0)
             return $value;
-        }
 
-        return parent::mapDirectiveAvailability($params);
+        $value = $this->getCellValue($args);
+
+        return $value;
     }
 
     public function mapFieldBrand($params = array())
@@ -137,16 +146,16 @@ class Doofinder_Feed_Model_Map_Product_Associated
         if ($value != "")
             return htmlspecialchars_decode($value);
 
-        $mapByCategory = $this->getConfig()->getMapCategorySorted(
-            'product_type_by_category',
-            $this->getStoreId()
-        );
-        $categoryIds = $this->getProduct()->getCategoryIds();
-        if (empty($categoryIds))
-            $categoryIds = $this->getParentMap()->getProduct()->getCategoryIds();
-        if (!empty($categoryIds) && !empty($mapByCategory)) {
-            foreach ($mapByCategory as $arr) {
-                if (array_search($arr['category'], $categoryIds) !== false) {
+        $map_by_category = $this->getConfig()->getMapCategorySorted('product_type_by_category', $this->getStoreId());
+        $category_ids = $this->getProduct()->getCategoryIds();
+        if (empty($category_ids))
+            $category_ids = $this->getParentMap()->getProduct()->getCategoryIds();
+        if (!empty($category_ids) && count($map_by_category) > 0)
+        {
+            foreach ($map_by_category as $arr)
+            {
+                if (array_search($arr['category'], $category_ids) !== false)
+                {
                     $value = $arr['value'];
                     break;
                 }

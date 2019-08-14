@@ -6,56 +6,39 @@
 /**
  * @category   Models
  * @package    Doofinder_Feed
- * @version    1.8.17
+ * @version    1.8.2
  */
 
 /**
  * Abstract Product Map Model for Doofinder Feed
  *
- * @version    1.8.17
+ * @version    1.8.2
  * @package    Doofinder_Feed
  */
 class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 {
-    protected $_fieldMap = null;
-    protected $_skip = false;
+    protected $_field_map = null;
+    protected $skip = false;
     protected $_attributeSetModel;
 
-    /**
-     * @var Doofinder_Feed_Helper_Log
-     */
-    protected $_log;
-
-    /**
-     * Initialize log
-     */
-    public function _construct()
-    {
-        parent::_construct();
-        $this->_log = Mage::helper('doofinder_feed/log');
-    }
 
     public function initialize()
     {
-        $this->_log->debugEnabled && $this->_log->debug(
-            sprintf('Initializing %s for product %d', get_called_class(), $this->getProduct()->getId())
-        );
-
-        $currencyCode = Mage::app()
+        $currency_code = Mage::app()
             ->getStore($this->getData('store_code'))
             ->getCurrentCurrencyCode();
 
-        $imagesUrlPrefix = Mage::app()
+        $images_url_prefix = Mage::app()
             ->getStore($this->getData('store_id'))
             ->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA, false);
-        $imagesUrlPrefix .= 'catalog/product';
+        $images_url_prefix .= 'catalog/product';
 
-        $imagesPathPrefix = Mage::getSingleton('catalog/product_media_config')
+        $images_path_prefix = Mage::getSingleton('catalog/product_media_config')
             ->getBaseMediaPath();
 
-        $this->setData('store_currency_code', $currencyCode);
-        $this->setData('images_url_prefix', $imagesUrlPrefix);
-        $this->setData('images_path_prefix', $imagesPathPrefix);
+        $this->setData('store_currency_code', $currency_code);
+        $this->setData('images_url_prefix', $images_url_prefix);
+        $this->setData('images_path_prefix', $images_path_prefix);
 
         $this->_attributeSetModel = Mage::getModel('eav/entity_attribute_set');
 
@@ -64,15 +47,9 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
     public function map()
     {
-        $this->_log->debugEnabled && $this->_log->debug(sprintf('Mapping product %d', $this->getProduct()->getId()));
-
         $this->_beforeMap();
         $rows = $this->_map();
         $this->_afterMap($rows);
-
-        $this->_log->debugEnabled && $this->_log->debug(
-            sprintf('Map for product %d: %s', $this->getProduct()->getId(), json_encode($rows))
-        );
 
         return $rows;
     }
@@ -82,13 +59,15 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $this;
     }
 
-    /**
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
     public function _afterMap($rows)
     {
         return $this;
     }
+
+
+    //
+    // protected::Mapping
+    //
 
     /**
      * @return array('column' => 'value')
@@ -97,14 +76,17 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
     {
         $fields = array();
 
-        foreach (array_keys($this->_fieldMap) as $column) {
+        foreach ($this->_field_map as $column => $arr)
             $fields[$column] = $this->mapField($column);
-        }
+
+        // $fields['magento_store'] = $this->getData('store_code');
 
         $this->_attributeSetModel->load(
-            $this->getProduct()->getAttributeSetId()
-        );
+            $this->getProduct()->getAttributeSetId());
+        // $fields['attribute_set'] = $this->_attributeSetModel
+        //     ->getAttributeSetName();
 
+        $i = 0;
         $categories = $this->getGenerator()->getCategories($this->getProduct());
         $fields['categories'] = implode(
             Doofinder_Feed_Model_Generator::CATEGORY_SEPARATOR,
@@ -118,10 +100,10 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
     {
         $value = "";
 
-        if (!isset($this->_fieldMap[$column]))
+        if (!isset($this->_field_map[$column]))
             return $value;
 
-        $args = array('map' => $this->_fieldMap[$column]);
+        $args = array('map' => $this->_field_map[$column]);
         $method = 'mapField' . $this->_camelize($column);
 
         if (method_exists($this, $method))
@@ -147,10 +129,29 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $this->cleanField($fieldData);
     }
 
+    protected function mapDoofinderAttribute($attribute, $product = null)
+    {
+        if (is_null($product))
+            $product = $this->getProduct();
+
+        if ($attribute === false)
+            $this->_attributeDoesNotExist($map['attribute']);
+
+        $fieldData = $this->getAttributeValue($product, $attribute);
+
+        return $this->cleanField($fieldData);
+    }
+
+
+    //
+    // protected::Mapping::Attributes
+    //
+
     protected function mapAttributeDescription($params = array())
     {
         $map = $params['map'];
         $product = $this->getProduct();
+        $fieldData = "";
 
         $attribute = $this->getGenerator()
             ->getAttribute($map['attribute']);
@@ -163,9 +164,17 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $this->cleanField($description);
     }
 
+
+    //
+    // protected::Mapping::Directives
+    //
+
     protected function mapDirectiveId()
     {
+        // $storeCode = $this->getStoreCode();
         $fieldData = $this->getProduct()->getId();
+        // $fieldData .= '_'.preg_replace('/[^a-zA-Z0-9]/', '', $storeCode);
+
         return $this->cleanField($fieldData);
     }
 
@@ -175,13 +184,8 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $product->getUrlModel()->getUrl($product, array('_nosid' => true));
     }
 
-    /**
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    // @codingStandardsIgnoreStart
     protected function mapDirectiveImageLink($args, $attributeName = 'image')
     {
-    // @codingStandardsIgnoreEnd
         $product = $this->getProduct();
         $image = $product->getData($attributeName);
 
@@ -209,57 +213,83 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $this->mapDirectiveImageLink($args, 'small_image');
     }
 
-    /**
-     * Get product price
-     *
-     * @param \Magento\Catalog\Model\Product $product
-     * @param string $field
-     * @return string|null
-     */
-    protected function getProductPrice($field)
+    public function collectProductPrices()
     {
-        if (!Mage::getStoreConfig('doofinder_cron/feed_settings/display_price', $this->getStoreCode())) {
-            return null;
-        }
+        if ( ! $this->getData('collected_product_prices') )
+        {
+            $dataHelper = Mage::helper('doofinder_feed');
+            $taxHelper = Mage::helper('tax');
 
-        $tax = null;
-        if (Mage::helper('tax')->needPriceConversion($this->getStoreCode())) {
-            switch (Mage::getStoreConfig('doofinder_cron/feed_settings/price_tax_mode', $this->getStoreCode())) {
-                case Doofinder_Feed_Model_System_Config_Source_Feed_Pricetaxmode::MODE_WITH_TAX:
-                    $tax = true;
-                    break;
+            $datum = $dataHelper->collectProductPrices(
+                $this->getProduct(),
+                $this->getGenerator()->getStore(),
+                true,
+                $this->getGenerator()->getData('minimal_price'),
+                $this->getGenerator()->getData('grouped')
+            );
 
-                case Doofinder_Feed_Model_System_Config_Source_Feed_Pricetaxmode::MODE_WITHOUT_TAX:
-                    $tax = false;
-                    break;
+            $priceDisplayType = $taxHelper->getPriceDisplayType($this->getGenerator()->getStore());
+
+            if ( $priceDisplayType == Mage_Tax_Model_Config::DISPLAY_TYPE_INCLUDING_TAX
+                 || $priceDisplayType == Mage_Tax_Model_Config::DISPLAY_TYPE_BOTH )
+            {
+                $priceKey = 'including_tax';
             }
+            else
+            {
+                $priceKey = 'excluding_tax';
+            }
+
+            $priceType = isset($datum['price_type']) ? $datum['price_type'] : false;
+
+            $prices = array(
+                'price_type' => $priceType,
+            );
+
+            foreach ( $datum as $priceType => $data ) {
+                if ( !is_array($data) ) continue;
+
+                foreach ( $data as $key => $price ) {
+                    if ( $key == $priceKey ) {
+                        $prices[$priceType] = $data[$key];
+                    }
+                }
+            }
+
+            $this->setData('collected_product_prices', $prices);
         }
 
-        $price = Mage::helper('doofinder_feed')->getProductPrice($this->getProduct(), $field, $tax);
-
-        if ($price === null) {
-            return $price;
-        }
-
-        $store = Mage::app()->getStore($this->getStoreCode());
-
-        // Return price converted to store currency
-        return Mage::helper('core')->currencyByStore($price, $store, false, false);
-    }
-
-    protected function mapFieldPrice()
-    {
-        return $this->mapDirectivePrice();
+        return $this->getData('collected_product_prices');
     }
 
     protected function mapDirectivePrice()
     {
-        return $this->getProductPrice('price');
+        $prices = $this->collectProductPrices();
+
+        if ( ! array_key_exists('price', $prices) )
+            return null;
+
+        $fieldData = $this->cleanField($prices['price']);
+
+        if ( $fieldData < 0 )
+            $this->skip = true;
+
+        return $fieldData;
     }
 
     protected function mapDirectiveSalePrice()
     {
-        return $this->getProductPrice('sale_price');
+        $prices = $this->collectProductPrices();
+
+        if ( ! array_key_exists('sale_price', $prices) )
+            return null;
+
+        $fieldData = $this->cleanField($prices['sale_price']);
+
+        if ( $fieldData <= 0 )
+            return null;
+
+        return $fieldData;
     }
 
     protected function mapDirectiveCurrency()
@@ -274,14 +304,15 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
         $defaultVal = isset($map['default_value']) ? $map['default_value'] : "";
 
-        if ($defaultVal != "") {
-            $stockStatus = $defaultVal;
-            $stockStatus = trim(strtolower($stockStatus));
+        if ($defaultVal != "")
+        {
+            $stock_status = $defaultVal;
+            $stock_status = trim(strtolower($stock_status));
 
-            if (false === array_search($stockStatus, (array) $this->getConfig()->getAllowedStockStatuses()))
-                $stockStatus = $this->getConfig()->getOutOfStockStatus();
+            if (false === array_search($stock_status, (array) $this->getConfig()->getAllowedStockStatuses()))
+                $stock_status = $this->getConfig()->getOutOfStockStatus();
 
-            $fieldData = $stockStatus;
+            $fieldData = $stock_status;
             $fieldData = $this->cleanField($fieldData);
 
             return $fieldData;
@@ -303,6 +334,7 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
     protected function mapDirectiveCondition($params = array())
     {
         $map = $params['map'];
+        $product = $this->getProduct();
 
         $defaultVal = isset($map['default_value']) ? $map['default_value'] : "";
         $defaultVal = trim(strtolower($defaultVal));
@@ -326,16 +358,19 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         $args = array('map' => $params['map']);
         $value = "";
 
-        $mapByCategory = $this->getConfig()->getMapCategorySorted(
+        $map_by_category = $this->getConfig()->getMapCategorySorted(
             'product_type_by_category',
             $this->getStoreId()
         );
 
-        $categoryIds = $this->getProduct()->getCategoryIds();
+        $category_ids = $this->getProduct()->getCategoryIds();
 
-        if (!empty($categoryIds) && !empty($mapByCategory)) {
-            foreach ($mapByCategory as $arr) {
-                if (array_search($arr['category'], $categoryIds) !== false) {
+        if (!empty($category_ids) && count($map_by_category) > 0)
+        {
+            foreach ($map_by_category as $arr)
+            {
+                if (array_search($arr['category'], $category_ids) !== false)
+                {
                     $value = $arr['value'];
                     break;
                 }
@@ -350,18 +385,26 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return htmlspecialchars_decode($value);
     }
 
+
+    //
+    // public::Tools
+    //
+
     public function getFieldValue($args = array())
     {
         $value = "";
         $attName = $args['map']['attribute'];
 
-        if ($this->getConfig()->isDirective($attName, $this->getStoreId())) {
+        if ($this->getConfig()->isDirective($attName, $this->getStoreId()))
+        {
             $attName = str_replace('df_directive_', '', $attName);
             $method = 'mapDirective' . $this->_camelize($attName);
 
             if (method_exists($this, $method))
                 $value = $this->$method($args);
-        } else {
+        }
+        else
+        {
             $method = 'mapAttribute' . $this->_camelize($attName);
 
             if (method_exists($this, $method))
@@ -378,11 +421,13 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         $attrCode = $attribute->getAttributeCode();
 
         if ($attribute->getFrontendInput() == 'select'
-            || $attribute->getFrontendInput() == 'multiselect'
-        ) {
-            if ($product->getResource()->getAttribute($attrCode) !== null)
+            || $attribute->getFrontendInput() == 'multiselect')
+        {
+            if (!is_null($product->getResource()->getAttribute($attrCode)))
                 $value = $product->getAttributeText($attrCode);
-        } else {
+        }
+        else
+        {
             $value = $product->getData($attrCode);
         }
 
@@ -396,12 +441,13 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         if ($product->getTypeId() != Mage_Catalog_Model_Product_Type::TYPE_CONFIGURABLE)
             return false;
 
-        $children = $this->getTools()->getChildsIds($product->getId());
-        if ($children === false)
+        $as = $this->getTools()->getChildsIds($product->getId());
+        if ($as === false)
             return $assocIds;
 
-        $children = $this->getTools()->getProductInStoresIds($children);
-        foreach ($children as $assocId => $s) {
+        $as = $this->getTools()->getProductInStoresIds($as);
+        foreach ($as as $assocId => $s)
+        {
             $attr = $this->getGenerator()->getAttribute('status');
             $status = $this->getTools()->getProductAttributeValueBySql(
                 $attr,
@@ -420,14 +466,99 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         return $assocIds;
     }
 
+    public function getPrice()
+    {
+        return $this->getProduct()->getPrice();
+    }
+
+    public function calcMinimalPrice($product)
+    {
+        return $product->getMinimalPrice();
+    }
+
+    public function getSpecialPrice()
+    {
+        return $this->getProduct()->getSpecialPrice();
+    }
+
+    public function hasSpecialPrice()
+    {
+        $has = false;
+        $product = $this->getProduct();
+
+        if ($this->getSpecialPrice() <= 0)
+            return $has;
+        if (is_empty_date($product->getSpecialFromDate()))
+            return $has;
+
+        $cDate = Mage::app()->getLocale()->date(null, null, Mage::app()->getLocale()->getDefaultLocale());
+        $timezone = Mage::app()->getStore($this->getStoreId())->getConfig(Mage_Core_Model_Locale::XML_PATH_DEFAULT_TIMEZONE);
+
+        $fromDate = new Zend_Date(null, null, Mage::app()->getLocale()->getDefaultLocale());
+        if ($timezone) $fromDate->setTimezone($timezone);
+        $fromDate->setDate(substr($product->getSpecialFromDate(), 0, 10), 'yyyy-MM-dd');
+        $fromDate->setTime(substr($product->getSpecialFromDate(), 11, 8), 'HH:mm:ss');
+
+        $toDate = new Zend_Date(null, null, Mage::app()->getLocale()->getDefaultLocale());
+        if (!is_empty_date($product->getSpecialToDate())) {
+            if ($timezone) $toDate->setTimezone($timezone);
+            $toDate->setDate(substr($product->getSpecialToDate(), 0, 10), 'yyyy-MM-dd');
+            $toDate->setTime('23:59:59', 'HH:mm:ss');
+        } else {
+            if ($timezone) $toDate->setTimezone($timezone);
+            $toDate->setDate($cDate->toString('yyyy-MM-dd'), 'yyyy-MM-dd');
+            $toDate->setTime('23:59:59', 'HH:mm:ss');
+            $toDate->add(7, Zend_Date::DAY);
+        }
+
+        if (($fromDate->compare($cDate) == -1
+                || $fromDate->compare($cDate) == 0)
+            && ($toDate->compare($cDate) == 1
+                || $toDate->compare($cDate) == 0))
+        {
+            $has = true;
+        }
+
+        return $has;
+    }
+
+
+    //
+    // protected::Tools
+    //
+
+    // protected function hasImage($product)
+    // {
+    //     $image = $product->getData('image');
+    //     $validator = new Zend_Validate_File_Exists;
+
+    //     if ($image != 'no_selection' && $image != "")
+    //     {
+    //         // if ($validator->isValid($this->getData('images_path_prefix') . $image) != 'fileExistsDoesNotExist')
+    //         //     return false;
+    //         if (!is_file($this->getData('images_path_prefix') . $image))
+    //             return false;
+    //     }
+    //     else
+    //     {
+    //         return false;
+    //     }
+
+    //     return true;
+    // }
+
     protected function cleanField($field)
     {
-        if (is_array($field)) {
-            foreach ($field as &$value) {
+        if (is_array($field))
+        {
+            foreach ($field as &$value)
+            {
                 $value = $this->cleanFieldValue($value);
                 unset($value);
             }
-        } else {
+        }
+        else
+        {
             $field = $this->cleanFieldValue($field);
         }
 
@@ -456,20 +587,15 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
     protected function _cleanFieldValue($field)
     {
         // http://stackoverflow.com/questions/4224141/php-removing-invalid-utf-8-characters-in-xml-using-filter
-        $validUtf = '/([\x09\x0A\x0D\x20-\x7E]|[\xC2-\xDF][\x80-\xBF]|' .
-                      '\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}|' .
-                      '\xED[\x80-\x9F][\x80-\xBF]|\xF0[\x90-\xBF][\x80-\xBF]{2}|' .
-                      '[\xF1-\xF3][\x80-\xBF]{3}|\xF4[\x80-\x8F][\x80-\xBF]{2})|./x';
+        $valid_utf8 = '/([\x09\x0A\x0D\x20-\x7E]|[\xC2-\xDF][\x80-\xBF]|\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}|\xED[\x80-\x9F][\x80-\xBF]|\xF0[\x90-\xBF][\x80-\xBF]{2}|[\xF1-\xF3][\x80-\xBF]{3}|\xF4[\x80-\x8F][\x80-\xBF]{2})|./x';
 
         $field = preg_replace('#<br(\s?/)?>#i', ' ', $field);
         $field = strip_tags($field);
         $field = preg_replace('/[ ]{2,}/', ' ', $field);
         $field = trim($field);
-        // @codingStandardsIgnoreStart
         $field = html_entity_decode($field, null, 'UTF-8');
-        // @codingStandardsIgnoreEnd
 
-        return preg_replace($validUtf, '$1', $field);
+        return preg_replace($valid_utf8, '$1', $field);
     }
 
     protected function _attributeDoesNotExist($attName)
@@ -477,12 +603,18 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
         Mage::throwException($attName . ' attribute does not exist!');
     }
 
+
+    //
+    // public::Config
+    //
+
     public function getConfig()
     {
         return $this->getGenerator()->getConfig();
     }
 
-    public function getConfigVar($key, $section = Doofinder_Feed_Model_Config::DEFAULT_SECTION)
+    public function getConfigVar($key,
+        $section = Doofinder_Feed_Model_Config::DEFAULT_SECTION)
     {
         return $this->getGenerator()->getConfigVar($key, null, $section);
     }
@@ -494,7 +626,7 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
     public function isSkip()
     {
-        return $this->_skip;
+        return $this->skip;
     }
 
     public function checkSkipSubmission()
@@ -504,7 +636,7 @@ class Doofinder_Feed_Model_Map_Product_Abstract extends Varien_Object
 
     public function setFieldsMap($arr)
     {
-        $this->_fieldMap = $arr;
+        $this->_field_map = $arr;
 
         return $this;
     }

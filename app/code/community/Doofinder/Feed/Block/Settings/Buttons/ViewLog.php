@@ -6,7 +6,7 @@
 /**
  * @category   blocks
  * @package    Doofinder_Feed
- * @version    1.8.17
+ * @version    1.8.2
  */
 
 class Doofinder_Feed_Block_Settings_Buttons_ViewLog extends Mage_Adminhtml_Block_System_Config_Form_Field
@@ -17,8 +17,7 @@ class Doofinder_Feed_Block_Settings_Buttons_ViewLog extends Mage_Adminhtml_Block
         $this->setElement($element);
         $element->setScopeLabel('');
 
-        $store = Mage::app()->getRequest()->getParam('store');
-        $process = Mage::getModel('doofinder_feed/cron')->load($store, 'store_code');
+        $process = Mage::getModel('doofinder_feed/cron')->load(Mage::app()->getRequest()->getParam('store'), 'store_code');
 
         $url = Mage::helper("adminhtml")->getUrl('adminhtml/doofinderFeedLog/view/processId/' . $process->getId());
 
