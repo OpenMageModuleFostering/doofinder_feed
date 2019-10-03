@@ -1,3 +1,5 @@
+
+
 ## Original Package Description
 
 This plugin allows you to integrate Doofinder in your store with almost no effort.

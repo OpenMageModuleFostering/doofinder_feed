@@ -1,7 +1,7 @@
 {
-    "name": "OpenMageModuleFostering\/Doofinder_Feed",
+    "name": "openmage-module-fostering\/doofinder_feed",
     "type": "magento-module",
-    "license": "Open-Software-License-(OSL-3.0)",
+    "license": "OSL-3.0",
     "homepage": "",
     "description": "This plugin allows you to integrate Doofinder in your store with almost no effort.",
     "authors": [
